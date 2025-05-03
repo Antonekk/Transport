@@ -18,6 +18,15 @@ ssize_t safe_sendto(int fd, const void *buf, size_t n, int flags, const struct s
     return result;
 }
 
+ssize_t safe_recvfrom(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *addr, socklen_t *addr_len)
+{
+    ssize_t result = recvfrom(sockfd, buf, len, flags, addr, addr_len);
+    if (result < 0){
+        error_exit("recvfrom");
+    }
+    return result;
+}
+
 void safe_inet_pton(int af, const char *src, void *dst){
     int res = inet_pton(af, src, dst);
     if (res == 1){
