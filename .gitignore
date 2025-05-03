@@ -45,6 +45,9 @@
 #VS Code
 .vscode/
 
+# Exclude build
+build/
+
 # Kernel Module Compile Results
 *.mod*
 *.cmd
