@@ -20,5 +20,12 @@ int safe_atoi(char *src){
         msg_exit("Can't convert port to int");
     }
     return result;
+}
 
+FILE *safe_fopen(const char *filename, const char *mode){
+    FILE *fd = fopen(filename, mode);
+    if(!fd){
+        error_exit("fopen");
+    }
+    return fd;
 }
