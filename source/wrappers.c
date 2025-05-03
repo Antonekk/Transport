@@ -1,6 +1,15 @@
 #include "wrappers.h"
 
 
+int safe_socket(int domain, int type, int protocol){
+    int s_fd = socket(domain, type, protocol);
+    if(!s_fd){
+        error_exit("socket");
+    }
+    return s_fd;
+}
+
+
 void safe_inet_pton(int af, const char *src, void *dst){
     int res = inet_pton(af, src, dst);
     if (res == 1){
