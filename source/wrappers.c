@@ -1,6 +1,7 @@
 #include "wrappers.h"
 
 
+
 int safe_socket(int domain, int type, int protocol){
     int s_fd = socket(domain, type, protocol);
     if(!s_fd){
@@ -9,6 +10,13 @@ int safe_socket(int domain, int type, int protocol){
     return s_fd;
 }
 
+ssize_t safe_sendto(int fd, const void *buf, size_t n, int flags, const struct sockaddr *addr, socklen_t addr_len){
+    ssize_t result = sendto(fd, buf, n, flags, addr, addr_len);
+    if(result < 0){
+        error_exit("sendto");
+    }
+    return result;
+}
 
 void safe_inet_pton(int af, const char *src, void *dst){
     int res = inet_pton(af, src, dst);
