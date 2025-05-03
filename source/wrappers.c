@@ -18,8 +18,8 @@ ssize_t safe_sendto(int fd, const void *buf, size_t n, int flags, const struct s
     return result;
 }
 
-ssize_t safe_recvfrom(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *addr, socklen_t *addr_len)
-{
+ssize_t safe_recvfrom(int sockfd, void *buf, size_t len, int flags,
+                    struct sockaddr *addr, socklen_t *addr_len){
     ssize_t result = recvfrom(sockfd, buf, len, flags, addr, addr_len);
     if (result < 0){
         error_exit("recvfrom");
