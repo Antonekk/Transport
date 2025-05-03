@@ -7,7 +7,7 @@
 
 int main(int argc, char *argv[]){
     
-    if (argc <= 1 || argc>=5){
+    if (argc != 5){
         msg_exit("Usage: transport [ip address] [port number] [filename] [size]");
     }
     char *ip_addr = argv[1];
