@@ -8,6 +8,8 @@
 
 #define DEBUG
 
+#define TIMEOUT 1000
+
 #define MAX_PORT 65535
 #define MAX_FILESIZE 10000000
 
@@ -64,15 +66,21 @@ int main(int argc, char *argv[]){
 
         // Setup request bufor
         int rq_length = to_recive - start < MAX_RESPONSE_BODY_LEN ? to_recive - start : MAX_RESPONSE_BODY_LEN;
-        snprintf(request_buf, sizeof(request_buf), "GET %d %d\n", start, rq_length);
+        int n = snprintf(request_buf, sizeof(request_buf), "GET %d %d\n", start, rq_length);
+        if (n < 0) {
+            error_exit("snprintf");
+        }
 
-        safe_sendto(socket_fd, request_buf, strlen(request_buf), 0, (struct sockaddr*)&server_addr, server_addr_len);
+        safe_sendto(socket_fd, request_buf, strlen(request_buf), 0, (struct sockaddr*)&server_addr, server_addr_len); 
+        #ifdef DEBUG
+        printf("Sent\n");
+        #endif   
 
         struct pollfd pfd= {
             .fd = socket_fd, 
             .events = POLLIN
         };
-        int ready = poll(&pfd, 1, -1);
+        int ready = poll(&pfd, 1, TIMEOUT);
         if (ready < 0){
             error_exit("poll");
         }
@@ -81,12 +89,34 @@ int main(int argc, char *argv[]){
         }
 
 
-        recvfrom(socket_fd, response_buf, MAX_RESPONSE_LEN, 0, (struct sockaddr*)&(server_addr),&server_addr_len);
+        safe_recvfrom(socket_fd, response_buf, MAX_RESPONSE_LEN, 0, (struct sockaddr*)&(server_addr),&server_addr_len);
+        
+        #ifdef DEBUG
+        printf("Recived\n");
+        #endif   
+
+        int response_start;
+        int response_length;
+        int header_len;
+        int tokens = sscanf(response_buf, "DATA %d %d\n%n", &response_start, &response_length, &header_len); 
+        if (tokens != 2){
+            // Check if correctly matched
+            continue;
+        }
+
+        if (response_start != start || response_length != rq_length){
+            continue;
+        }
+        size_t written = fwrite(response_buf+header_len, sizeof(char), response_length, file);
+        if (written < response_length){
+            error_exit("fwrite");
+        }
 
 
         start+=rq_length;
     }
 
-
+    close(socket_fd);
+    fclose(file);
     return EXIT_SUCCESS;
 }

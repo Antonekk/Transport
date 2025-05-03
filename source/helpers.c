@@ -1,7 +1,6 @@
 #include <helpers.h>
 
 
-
 void error_exit(const char *msg){
      fprintf(stderr, "%s: %s\n", msg, strerror(errno));
      exit(EXIT_FAILURE);

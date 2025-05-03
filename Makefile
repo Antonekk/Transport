@@ -42,7 +42,7 @@ $(BUILD_DIR)/%.cpp.o: %.cpp
 .PHONY: test
 
 test: 
-	./build/transport 127.0.0.1 2115 myfile 1321
+	./build/transport 127.0.0.1 2115 myfile 15312
 
 .PHONY: clean
 clean:
