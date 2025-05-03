@@ -5,7 +5,9 @@
 #include "helpers.h"
 #include "wrappers.h"
 
-
+#define MAX_PORT 65535
+#define MAX_FILESIZE 10000000
+#define MAX_DATAGRAM_DATA_LENGTH 1000
 
 int main(int argc, char *argv[]){
     
@@ -17,17 +19,24 @@ int main(int argc, char *argv[]){
     char *filename = argv[3];
     int size = safe_atoi(argv[4]);
 
-    printf("transport ip %s | port %d | filename %s | size %d\n", ip_addr, port_number, filename, size);
-    int socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if(!socket_fd){
-        error_exit("socket: ");
+    if (port_number < 0 || port_number > MAX_PORT){
+        msg_exit("Port number outside of valid range");
     }
 
 
-    struct sockaddr_in server_addr = {0};
+    printf("transport ip %s | port %d | filename %s | size %d\n", ip_addr, port_number, filename, size);
+    int socket_fd = safe_socket(AF_INET, SOCK_DGRAM, 0);
+
+
+    struct sockaddr_in server_addr;
+    memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(port_number);
     safe_inet_pton(AF_INET, ip_addr, &server_addr.sin_addr);
+
+    
+
+
 
     return EXIT_SUCCESS;
 }
