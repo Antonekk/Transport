@@ -39,6 +39,11 @@ $(BUILD_DIR)/%.cpp.o: %.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 
+.PHONY: test
+
+test: 
+	./build/transport 127.0.0.1 888 myfile 321
+
 .PHONY: clean
 clean:
 	rm -r $(BUILD_DIR)
