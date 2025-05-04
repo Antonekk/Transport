@@ -2,7 +2,7 @@
 
 
 
-int safe_socket(int domain, int type, int protocol){
+int my_socket(int domain, int type, int protocol){
     int s_fd = socket(domain, type, protocol);
     if(!s_fd){
         error_exit("socket");
@@ -10,7 +10,7 @@ int safe_socket(int domain, int type, int protocol){
     return s_fd;
 }
 
-ssize_t safe_sendto(int fd, const void *buf, size_t n, int flags, const struct sockaddr *addr, socklen_t addr_len){
+ssize_t my_sendto(int fd, const void *buf, size_t n, int flags, const struct sockaddr *addr, socklen_t addr_len){
     ssize_t result = sendto(fd, buf, n, flags, addr, addr_len);
     if(result < 0){
         error_exit("sendto");
@@ -18,7 +18,7 @@ ssize_t safe_sendto(int fd, const void *buf, size_t n, int flags, const struct s
     return result;
 }
 
-ssize_t safe_recvfrom(int sockfd, void *buf, size_t len, int flags,
+ssize_t my_recvfrom(int sockfd, void *buf, size_t len, int flags,
                     struct sockaddr *addr, socklen_t *addr_len){
     ssize_t result = recvfrom(sockfd, buf, len, flags, addr, addr_len);
     if (result < 0){
@@ -27,7 +27,7 @@ ssize_t safe_recvfrom(int sockfd, void *buf, size_t len, int flags,
     return result;
 }
 
-void safe_inet_pton(int af, const char *src, void *dst){
+void my_inet_pton(int af, const char *src, void *dst){
     int res = inet_pton(af, src, dst);
     if (res == 1){
         return;
@@ -40,7 +40,7 @@ void safe_inet_pton(int af, const char *src, void *dst){
     }}
 }
 
-int safe_atoi(char *src){
+int my_atoi(char *src){
     int result;
     if (!(result = atoi(src))){
         msg_exit("Can't convert port to int");
@@ -48,7 +48,7 @@ int safe_atoi(char *src){
     return result;
 }
 
-FILE *safe_fopen(const char *filename, const char *mode){
+FILE *my_fopen(const char *filename, const char *mode){
     FILE *fd = fopen(filename, mode);
     if(!fd){
         error_exit("fopen");
