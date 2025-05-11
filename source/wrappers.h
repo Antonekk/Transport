@@ -12,7 +12,7 @@ ssize_t my_sendto(int fd, const void *buf, size_t n, int flags,
 ssize_t my_recvfrom(int sockfd, void *buf, size_t len, int flags,
                     struct sockaddr *addr, socklen_t *addr_len);
 
-
+void *my_calloc(size_t nmemb, size_t size);
 
 int my_atoi(char *src);
 

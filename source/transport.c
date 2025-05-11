@@ -19,15 +19,36 @@ void setup_server_addr(struct sockaddr_in *server_addr, int port_number, char *i
 }
 
 
+// After my advanced calculations this won't result in momory usage > 8MB (i hope)
+void init_window(datagram_t *window, size_t to_send, int to_recive){
+    for(int i = 0; i < to_send; i++){
+        int start = i * MAX_RESPONSE_BODY_LEN;
+        window[i].start = start;
+        window[i].length = to_recive - start < MAX_RESPONSE_BODY_LEN ? to_recive - start : MAX_RESPONSE_BODY_LEN;
+    }
+}
+
 
 void transport(int socket_fd, int to_recive, struct sockaddr_in *server_addr, FILE* file ){
     
 
     socklen_t server_addr_len = sizeof(*server_addr);
+
+    int datagrams_count = to_recive / MAX_RESPONSE_BODY_LEN;
+    size_t to_send = datagrams_count < SENDER_WINDOW_SIZE ? datagrams_count : SENDER_WINDOW_SIZE;
+    datagram_t *window = my_calloc(to_send, sizeof(datagram_t));
+    init_window(window, to_send, to_recive);
     
+    
+    struct pollfd pfd= {
+        .fd = socket_fd, 
+        .events = POLLIN
+    };
     // Setup request/response buffors 
     char request_buf[MAX_REQUEST_LEN];
     char response_buf[MAX_RESPONSE_LEN];
+
+    int frame_index = 0;
     int start = 0;
 
     // Loop until all data is recived
@@ -45,10 +66,7 @@ void transport(int socket_fd, int to_recive, struct sockaddr_in *server_addr, FI
         printf("Sent\n");
         #endif   
 
-        struct pollfd pfd= {
-            .fd = socket_fd, 
-            .events = POLLIN
-        };
+        
         int ready = poll(&pfd, 1, TIMEOUT);
         if (ready < 0){
             error_exit("poll");

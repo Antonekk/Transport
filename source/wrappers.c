@@ -27,6 +27,14 @@ ssize_t my_recvfrom(int sockfd, void *buf, size_t len, int flags,
     return result;
 }
 
+
+void *my_calloc(size_t nmemb, size_t size) {
+    void *ptr = calloc(nmemb, size);
+    if (!ptr)
+      error_exit("Calloc error");
+    return ptr;
+}
+
 void my_inet_pton(int af, const char *src, void *dst){
     int res = inet_pton(af, src, dst);
     if (res == 1){
