@@ -35,6 +35,15 @@ void *my_calloc(size_t nmemb, size_t size) {
     return ptr;
 }
 
+int my_clock_gettime(clockid_t clockid, struct timespec *tp){
+    int res = clock_gettime(clockid, tp);
+    if(res < 0){
+        error_exit("clock_gettime error");
+    }
+    return res;
+}
+
+
 void my_inet_pton(int af, const char *src, void *dst){
     int res = inet_pton(af, src, dst);
     if (res == 1){

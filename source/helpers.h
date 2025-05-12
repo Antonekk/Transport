@@ -23,6 +23,7 @@
 
 // Window
 
+#define RESEND_TIME 1000
 #define SENDER_WINDOW_SIZE 5
 
 #define IDLE 1
@@ -38,6 +39,14 @@ typedef struct Datagram{
 } datagram_t;
 
 
+typedef struct Frame{
+    int frame_index;
+    int datagrams_count;
+    datagram_t *frame_ptr;
+} frame_t;
+
+
+int time_diff_ms(struct timespec *t1, struct timespec *t2);
 
 // Error handling
 void error_exit(const char *msg);

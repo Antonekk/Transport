@@ -2,6 +2,8 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <poll.h>
+#include <time.h>
+#include <math.h>
 
 #include "helpers.h"
 #include "wrappers.h"
@@ -25,48 +27,60 @@ void init_window(datagram_t *window, size_t to_send, int to_recive){
         int start = i * MAX_RESPONSE_BODY_LEN;
         window[i].start = start;
         window[i].length = to_recive - start < MAX_RESPONSE_BODY_LEN ? to_recive - start : MAX_RESPONSE_BODY_LEN;
+        window[i].status = IDLE;
     }
 }
 
 
+void send_datagrams(int socket_fd, frame_t *window, struct sockaddr_in *server_addr){
+    socklen_t server_addr_len = sizeof(*server_addr);
+
+    struct timespec current_time;
+    my_clock_gettime(CLOCK_MONOTONIC, &current_time);
+
+    datagram_t *cur_window = window->frame_ptr;
+    int frame_index = window->frame_index;
+    for(int i = 0; i<SENDER_WINDOW_SIZE; i++){
+        int idx = frame_index + i;
+        if(cur_window[idx].status == IDLE || (cur_window[idx].status == SENT 
+            && time_diff_ms(&cur_window[idx].timestamp, &current_time)) > RESEND_TIME){
+            char request_buf[MAX_REQUEST_LEN];
+            int n = snprintf(request_buf, sizeof(request_buf), "GET %d %d\n", cur_window[idx].start, cur_window[idx].length);
+            if (n < 0) {
+                error_exit("snprintf");
+            }
+            my_sendto(socket_fd,request_buf , strlen(request_buf), 0, (struct sockaddr*)server_addr, server_addr_len); 
+            #ifdef DEBUG
+            printf("Sent\n");
+            #endif   
+            cur_window[idx].status = SENT;
+            cur_window[idx].timestamp = current_time;
+        }
+    }
+}
+
 void transport(int socket_fd, int to_recive, struct sockaddr_in *server_addr, FILE* file ){
     
 
-    socklen_t server_addr_len = sizeof(*server_addr);
-
-    int datagrams_count = to_recive / MAX_RESPONSE_BODY_LEN;
-    size_t to_send = datagrams_count < SENDER_WINDOW_SIZE ? datagrams_count : SENDER_WINDOW_SIZE;
-    datagram_t *window = my_calloc(to_send, sizeof(datagram_t));
-    init_window(window, to_send, to_recive);
+    frame_t window;
+    window.frame_index = 0;
+    window.datagrams_count = to_recive / MAX_RESPONSE_BODY_LEN + (to_recive % MAX_RESPONSE_BODY_LEN != 0);
+    window.frame_ptr = my_calloc(window.datagrams_count, sizeof(datagram_t));
+    init_window(window.frame_ptr, window.datagrams_count, to_recive);
     
     
     struct pollfd pfd= {
         .fd = socket_fd, 
         .events = POLLIN
     };
-    // Setup request/response buffors 
-    char request_buf[MAX_REQUEST_LEN];
-    char response_buf[MAX_RESPONSE_LEN];
 
-    int frame_index = 0;
-    int start = 0;
 
     // Loop until all data is recived
-    while (start < to_recive){
-
-        // Setup request bufor
-        int rq_length = to_recive - start < MAX_RESPONSE_BODY_LEN ? to_recive - start : MAX_RESPONSE_BODY_LEN;
-        int n = snprintf(request_buf, sizeof(request_buf), "GET %d %d\n", start, rq_length);
-        if (n < 0) {
-            error_exit("snprintf");
-        }
-
-        my_sendto(socket_fd, request_buf, strlen(request_buf), 0, (struct sockaddr*)server_addr, server_addr_len); 
-        #ifdef DEBUG
-        printf("Sent\n");
-        #endif   
+    while (window.frame_index < window.datagrams_count){
 
         
+        send_datagrams(socket_fd, &window, server_addr);
+
         int ready = poll(&pfd, 1, TIMEOUT);
         if (ready < 0){
             error_exit("poll");
@@ -75,6 +89,7 @@ void transport(int socket_fd, int to_recive, struct sockaddr_in *server_addr, FI
             continue;
         }
 
+        char response_buf[MAX_RESPONSE_LEN];
         struct sockaddr_in sender_addr;
         socklen_t sender_len = sizeof(sender_addr);
         my_recvfrom(socket_fd, response_buf, MAX_RESPONSE_LEN, 0, (struct sockaddr*)&sender_addr,&sender_len);
@@ -92,19 +107,35 @@ void transport(int socket_fd, int to_recive, struct sockaddr_in *server_addr, FI
         int response_start;
         int response_length;
         int header_len;
-        int tokens = sscanf(response_buf, "DATA %d %d\n%n", &response_start, &response_length, &header_len); 
-        if (tokens != 2 || response_start != start || response_length != rq_length){
+        int tokens = sscanf(response_buf, "DATA %d %d\n%n", &response_start, &response_length, &header_len);
+        if (tokens != 2){
             // Check if correctly matched
             continue;
         }
-        
-        size_t written = fwrite(response_buf+header_len, sizeof(char), response_length, file);
-        if (written < response_length){
-            error_exit("fwrite");
+
+        int idx = response_start / MAX_RESPONSE_BODY_LEN;
+        if(idx < window.frame_index 
+            || idx >= window.frame_index + SENDER_WINDOW_SIZE
+            || window.frame_ptr[idx].start != response_start
+            || window.frame_ptr[idx].length != response_length
+            || window.frame_ptr->status == RECIVED){
+            continue;
         }
 
+        memcpy(window.frame_ptr[idx].data, response_buf+header_len, response_length);
+        window.frame_ptr[idx].status = RECIVED;
 
-        start+=rq_length;
+        while(window.frame_index < window.datagrams_count 
+              && window.frame_ptr[window.frame_index].status == RECIVED){
+            
+            datagram_t w_datagram = window.frame_ptr[window.frame_index];
+            size_t written = fwrite(w_datagram.data, sizeof(char), w_datagram.length, file);
+            if (written < response_length){
+                error_exit("fwrite");
+            }
+            window.frame_index++;
+        }
+        
     }
 }
 

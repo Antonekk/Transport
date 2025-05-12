@@ -2,6 +2,9 @@
 #define WRAPPERS_H
 
 #include <arpa/inet.h>
+#include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "helpers.h"
 
 void my_inet_pton(int af, const char *src, void *dst);
@@ -13,6 +16,8 @@ ssize_t my_recvfrom(int sockfd, void *buf, size_t len, int flags,
                     struct sockaddr *addr, socklen_t *addr_len);
 
 void *my_calloc(size_t nmemb, size_t size);
+
+int my_clock_gettime(clockid_t clockid, struct timespec *tp);
 
 int my_atoi(char *src);
 
