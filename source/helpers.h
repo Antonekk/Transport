@@ -24,7 +24,7 @@
 // Window
 
 #define RESEND_TIME 1000
-#define SENDER_WINDOW_SIZE 5
+#define SENDER_WINDOW_SIZE 2000
 
 #define IDLE 1
 #define SENT 2
@@ -44,6 +44,9 @@ typedef struct Frame{
     int datagrams_count;
     datagram_t *frame_ptr;
 } frame_t;
+
+
+datagram_t *get_from_circular(datagram_t *frame_ptr, int idx);
 
 
 int time_diff_ms(struct timespec *t1, struct timespec *t2);

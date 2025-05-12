@@ -8,8 +8,8 @@
 #include "helpers.h"
 #include "wrappers.h"
 
-#define DEBUG
-
+//#define DEBUG
+#define PROGRESS
 
 void setup_server_addr(struct sockaddr_in *server_addr, int port_number, char *ip_addr){
     server_addr->sin_family = AF_INET;
@@ -24,28 +24,32 @@ void setup_server_addr(struct sockaddr_in *server_addr, int port_number, char *i
 // After my advanced calculations this won't result in momory usage > 8MB (i hope)
 void init_window(datagram_t *window, size_t to_send, int to_recive){
     for(int i = 0; i < to_send; i++){
-        int start = i * MAX_RESPONSE_BODY_LEN;
-        window[i].start = start;
-        window[i].length = to_recive - start < MAX_RESPONSE_BODY_LEN ? to_recive - start : MAX_RESPONSE_BODY_LEN;
+        window[i].start = -1;
         window[i].status = IDLE;
     }
 }
 
 
-void send_datagrams(int socket_fd, frame_t *window, struct sockaddr_in *server_addr){
+void send_datagrams(int socket_fd, frame_t *window, struct sockaddr_in *server_addr, int to_recive){
     socklen_t server_addr_len = sizeof(*server_addr);
 
     struct timespec current_time;
     my_clock_gettime(CLOCK_MONOTONIC, &current_time);
 
-    datagram_t *cur_window = window->frame_ptr;
-    int frame_index = window->frame_index;
     for(int i = 0; i<SENDER_WINDOW_SIZE; i++){
-        int idx = frame_index + i;
-        if(cur_window[idx].status == IDLE || (cur_window[idx].status == SENT 
-            && time_diff_ms(&cur_window[idx].timestamp, &current_time)) > RESEND_TIME){
+        int idx = window->frame_index + i;
+        if(idx >= window->datagrams_count) break;
+
+        datagram_t *current_datagram = get_from_circular(window->frame_ptr, idx);
+        if(current_datagram->status == IDLE || (current_datagram->status == SENT 
+            && time_diff_ms(&current_datagram->timestamp, &current_time) > RESEND_TIME)){
+            
+            int start = idx * MAX_RESPONSE_BODY_LEN;
+            current_datagram->start = start;
+            current_datagram->length = to_recive - start < MAX_RESPONSE_BODY_LEN ? to_recive - start : MAX_RESPONSE_BODY_LEN;
+
             char request_buf[MAX_REQUEST_LEN];
-            int n = snprintf(request_buf, sizeof(request_buf), "GET %d %d\n", cur_window[idx].start, cur_window[idx].length);
+            int n = snprintf(request_buf, sizeof(request_buf), "GET %d %d\n", current_datagram->start, current_datagram->length);
             if (n < 0) {
                 error_exit("snprintf");
             }
@@ -53,8 +57,8 @@ void send_datagrams(int socket_fd, frame_t *window, struct sockaddr_in *server_a
             #ifdef DEBUG
             printf("Sent\n");
             #endif   
-            cur_window[idx].status = SENT;
-            cur_window[idx].timestamp = current_time;
+            current_datagram->status = SENT;
+            current_datagram->timestamp = current_time;
         }
     }
 }
@@ -65,8 +69,8 @@ void transport(int socket_fd, int to_recive, struct sockaddr_in *server_addr, FI
     frame_t window;
     window.frame_index = 0;
     window.datagrams_count = to_recive / MAX_RESPONSE_BODY_LEN + (to_recive % MAX_RESPONSE_BODY_LEN != 0);
-    window.frame_ptr = my_calloc(window.datagrams_count, sizeof(datagram_t));
-    init_window(window.frame_ptr, window.datagrams_count, to_recive);
+    window.frame_ptr = my_calloc(SENDER_WINDOW_SIZE, sizeof(datagram_t));
+    init_window(window.frame_ptr, SENDER_WINDOW_SIZE, to_recive);
     
     
     struct pollfd pfd= {
@@ -77,9 +81,8 @@ void transport(int socket_fd, int to_recive, struct sockaddr_in *server_addr, FI
 
     // Loop until all data is recived
     while (window.frame_index < window.datagrams_count){
-
         
-        send_datagrams(socket_fd, &window, server_addr);
+        send_datagrams(socket_fd, &window, server_addr, to_recive);
 
         int ready = poll(&pfd, 1, TIMEOUT);
         if (ready < 0){
@@ -114,26 +117,31 @@ void transport(int socket_fd, int to_recive, struct sockaddr_in *server_addr, FI
         }
 
         int idx = response_start / MAX_RESPONSE_BODY_LEN;
+        datagram_t *recived_entry = get_from_circular(window.frame_ptr, idx);
         if(idx < window.frame_index 
             || idx >= window.frame_index + SENDER_WINDOW_SIZE
-            || window.frame_ptr[idx].start != response_start
-            || window.frame_ptr[idx].length != response_length
-            || window.frame_ptr->status == RECIVED){
+            || recived_entry->start != response_start
+            || recived_entry->length != response_length
+            || recived_entry->status == RECIVED){
             continue;
         }
 
-        memcpy(window.frame_ptr[idx].data, response_buf+header_len, response_length);
-        window.frame_ptr[idx].status = RECIVED;
+        memcpy(recived_entry->data, response_buf+header_len, response_length);
+        recived_entry->status = RECIVED;
 
-        while(window.frame_index < window.datagrams_count 
-              && window.frame_ptr[window.frame_index].status == RECIVED){
+
+        while(window.frame_index < window.datagrams_count){
+            datagram_t *head = get_from_circular(window.frame_ptr, window.frame_index);
+            if(head->status != RECIVED) break;
             
-            datagram_t w_datagram = window.frame_ptr[window.frame_index];
-            size_t written = fwrite(w_datagram.data, sizeof(char), w_datagram.length, file);
+            size_t written = fwrite(head->data, sizeof(char), head->length, file);
             if (written < response_length){
                 error_exit("fwrite");
             }
             window.frame_index++;
+            #ifdef PROGRESS
+            printf("Progress %f\n", (float)(window.frame_index)/window.datagrams_count);
+            #endif
         }
         
     }

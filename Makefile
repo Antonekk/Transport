@@ -36,7 +36,7 @@ $(BUILD_DIR)/%.c.o: %.c
 .PHONY: test
 
 test: 
-	./build/transport 127.0.0.1 2115 myfile 15312
+	./build/transport 127.0.0.1 2115 myfile 9013041
 
 .PHONY: clean
 clean:
