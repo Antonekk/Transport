@@ -135,7 +135,7 @@ void transport(int socket_fd, int to_recive, struct sockaddr_in *server_addr, FI
             if(head->status != RECIVED) break;
             
             size_t written = fwrite(head->data, sizeof(char), head->length, file);
-            if (written < response_length){
+            if (written < head->length){
                 error_exit("fwrite");
             }
             window.frame_index++;

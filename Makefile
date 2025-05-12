@@ -1,48 +1,34 @@
-TARGET_EXEC := transport
-
-BUILD_DIR := ./build
-SRC_DIR := ./source
-
-# Find all the C files in SRC_DIR 
-SRCS := $(shell find $(SRC_DIR)  -name '*.c')
-
-# Prepends BUILD_DIR and appends .o to every src file
-# As an example, ./your_dir/hello.cpp turns into ./build/./your_dir/hello.cpp.o
-OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
-
-# String substitution (suffix version without %).
-# As an example, ./build/hello.cpp.o turns into ./build/hello.cpp.d
-DEPS := $(OBJS:.o=.d)
-
-# Every folder in ./src will need to be passed to GCC so that it can find header files
-INC_DIRS := $(shell find $(SRC_DIR) -type d)
-# Add a prefix to INC_DIRS. So moduleA would become -ImoduleA. GCC understands this -I flag
-INC_FLAGS := $(addprefix -I,$(INC_DIRS))
-
-# The -MMD and -MP flags together generate Makefiles for us!
-# These files will have .d instead of .o as the output.
-CPPFLAGS := $(INC_FLAGS) -MMD -MP
-
-# The final build step.
-$(BUILD_DIR)/$(TARGET_EXEC): $(OBJS)
-	$(CXX) -g -O0 $(OBJS) -o $@ $(LDFLAGS)
-
-# Build step for C source
-$(BUILD_DIR)/%.c.o: %.c
-	mkdir -p $(dir $@)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+CC = gcc
+CFLAGS = -std=gnu17 -Wall -Wextra
 
 
-.PHONY: test
+EXEC = transport
+SRC = transport.c helpers.c wrappers.c
+OBJ = $(SRC:.c=.o)
+
+
+all: $(EXEC)
+
+$(EXEC): $(OBJ)
+	$(CC) $(CFLAGS) $(OBJ) -o $(EXEC)
+
+wrappers.o: wrappers.c wrappers.h
+	$(CC) $(CFLAGS) -c wrappers.c -o wrappers.o
+
+helpers.o: helpers.c helpers.h
+	$(CC) $(CFLAGS) -c helpers.c -o helpers.o
+
+transport.o: transport.c 
+	$(CC) $(CFLAGS) -c transport.c -o transport.o
+
+
+clean:
+	rm -f $(OBJ)
+
+distclean: clean
+	rm -f $(OBJ) $(EXEC)
+
+
 
 test: 
-	./build/transport 127.0.0.1 2115 myfile 9013041
-
-.PHONY: clean
-clean:
-	rm -r $(BUILD_DIR)
-
-# Include the .d makefiles. The - at the front suppresses the errors of missing
-# Makefiles. Initially, all the .d files will be missing, and we don't want those
-# errors to show up.
--include $(DEPS)
+	./transport 127.0.0.1 2115 myfile 9013041
